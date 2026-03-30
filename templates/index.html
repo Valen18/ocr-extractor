@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR Extractor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --brand: #4f46e5;
+            --brand-light: #eef2ff;
+            --brand-dark: #3730a3;
+            --surface: #ffffff;
+            --bg: #f8fafc;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --success: #059669;
+            --warning: #d97706;
+            --danger: #dc2626;
+            --radius: 12px;
+            --shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+            --shadow-lg: 0 4px 12px rgba(0,0,0,.08);
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* ── Header ──────────────────────────────── */
+        .app-header {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .app-header h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .app-header h1 i { color: var(--brand); font-size: 1.4rem; }
+        .header-badge {
+            font-size: 0.75rem;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+        }
+
+        /* ── Cards ──────────────────────────────── */
+        .card-section {
+            background: var(--surface);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+        .card-section .section-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .section-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .section-title i { color: var(--brand); }
+
+        /* ── Dropzone ────────────────────────────── */
+        .dropzone {
+            border: 2px dashed var(--border);
+            border-radius: var(--radius);
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all .2s;
+            background: var(--bg);
+        }
+        .dropzone:hover, .dropzone.drag-over {
+            border-color: var(--brand);
+            background: var(--brand-light);
+        }
+        .dropzone .drop-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: var(--brand-light);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 12px;
+        }
+        .dropzone .drop-icon i { font-size: 1.4rem; color: var(--brand); }
+        .dropzone h3 { font-size: 0.95rem; font-weight: 600; margin: 0 0 4px; }
+        .dropzone p { font-size: 0.8rem; color: var(--text-muted); margin: 0; }
+
+        /* ── Processing state ────────────────────── */
+        .processing-indicator {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px 20px;
+            background: #fffbeb;
+            border-bottom: 1px solid #fde68a;
+        }
+        .processing-indicator .spinner-border { width: 18px; height: 18px; border-width: 2px; }
+
+        /* ── AI Prompt section ───────────────────── */
+        .ai-prompt-section {
+            background: linear-gradient(135deg, #eef2ff 0%, #faf5ff 100%);
+            border: 1px solid #c7d2fe;
+            border-radius: var(--radius);
+            padding: 20px;
+        }
+        .ai-prompt-section textarea {
+            border: 1px solid #c7d2fe;
+            border-radius: 8px;
+            resize: none;
+            font-size: 0.85rem;
+            padding: 12px;
+            width: 100%;
+            background: white;
+        }
+        .ai-prompt-section textarea:focus {
+            outline: none;
+            border-color: var(--brand);
+            box-shadow: 0 0 0 3px rgba(79,70,229,.12);
+        }
+        .ai-config-result {
+            margin-top: 12px;
+            padding: 12px 16px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #c7d2fe;
+            font-size: 0.82rem;
+        }
+        .column-tag {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            margin: 2px;
+            background: var(--brand-light);
+            color: var(--brand-dark);
+            border: 1px solid #c7d2fe;
+        }
+
+        /* ── Queue ────────────────────────────────── */
+        .queue-list {
+            max-height: 120px;
+            overflow-y: auto;
+            padding: 8px 20px;
+        }
+        .queue-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 0;
+            font-size: 0.8rem;
+        }
+        .queue-item .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .queue-item .status-dot.pending { background: var(--border); }
+        .queue-item .status-dot.active { background: var(--warning); animation: pulse 1s infinite; }
+        .queue-item .status-dot.done { background: var(--success); }
+        .queue-item .status-dot.error { background: var(--danger); }
+        @keyframes pulse { 50% { opacity: .4; } }
+
+        /* ── Data table ──────────────────────────── */
+        .data-table-wrap {
+            overflow-x: auto;
+            max-height: calc(100vh - 400px);
+            min-height: 200px;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 0.8rem;
+        }
+        .data-table thead {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .data-table thead th {
+            background: #f1f5f9;
+            padding: 8px 12px;
+            font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            color: var(--text-muted);
+            border-bottom: 2px solid var(--border);
+            white-space: nowrap;
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+        }
+        .data-table thead th:hover { background: #e2e8f0; }
+        .data-table thead th .sort-icon {
+            margin-left: 4px;
+            opacity: 0.3;
+            font-size: 0.7rem;
+        }
+        .data-table thead th.sorted-asc .sort-icon,
+        .data-table thead th.sorted-desc .sort-icon { opacity: 1; color: var(--brand); }
+
+        /* Filter row */
+        .data-table thead .filter-row th {
+            padding: 4px 6px;
+            background: #f8fafc;
+            border-bottom: 1px solid var(--border);
+        }
+        .filter-input {
+            width: 100%;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 3px 6px;
+            font-size: 0.75rem;
+            outline: none;
+            background: white;
+        }
+        .filter-input:focus {
+            border-color: var(--brand);
+            box-shadow: 0 0 0 2px rgba(79,70,229,.1);
+        }
+        .filter-input::placeholder { color: #cbd5e1; }
+
+        .data-table tbody td {
+            padding: 2px 4px;
+            border-bottom: 1px solid #f1f5f9;
+            vertical-align: middle;
+        }
+        .data-table tbody tr:hover td { background: #f8fafc; }
+        .data-table tbody tr.hidden-row { display: none; }
+
+        /* Inline editable cells */
+        .cell-input {
+            border: none;
+            background: transparent;
+            width: 100%;
+            padding: 4px 8px;
+            font-size: 0.8rem;
+            outline: none;
+            border-radius: 4px;
+        }
+        .cell-input:focus {
+            background: #eff6ff;
+            box-shadow: inset 0 0 0 1px var(--brand);
+        }
+        .cell-input.edited { background: #fefce8 !important; }
+        .cell-input.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+        /* Row states */
+        .data-table tbody tr.processing { opacity: 0.5; }
+        .data-table tbody tr.error-row td { background: #fef2f2; }
+
+        /* ── Status badge ────────────────────────── */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.7rem;
+            font-weight: 500;
+            padding: 2px 8px;
+            border-radius: 12px;
+        }
+        .status-badge.ok { background: #ecfdf5; color: var(--success); }
+        .status-badge.error { background: #fef2f2; color: var(--danger); }
+
+        /* ── Empty state ─────────────────────────── */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+        .empty-state i { font-size: 2.5rem; opacity: .4; }
+        .empty-state p { margin: 12px 0 0; font-size: 0.85rem; }
+
+        /* ── Buttons ─────────────────────────────── */
+        .btn-brand {
+            background: var(--brand);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            transition: background .15s;
+        }
+        .btn-brand:hover { background: var(--brand-dark); color: white; }
+        .btn-ghost {
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 6px 14px;
+            font-size: 0.8rem;
+            color: var(--text);
+            transition: all .15s;
+        }
+        .btn-ghost:hover { background: var(--bg); border-color: #cbd5e1; }
+        .btn-icon {
+            background: transparent;
+            border: none;
+            padding: 4px;
+            cursor: pointer;
+            opacity: 0.3;
+            transition: opacity .15s;
+            color: var(--danger);
+            line-height: 1;
+        }
+        .btn-icon:hover { opacity: 1; }
+
+        /* ── Toast ────────────────────────────────── */
+        .toast-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .app-toast {
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 0.82rem;
+            font-weight: 500;
+            color: white;
+            box-shadow: var(--shadow-lg);
+            animation: slideIn .3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .app-toast.success { background: var(--success); }
+        .app-toast.warning { background: var(--warning); }
+        .app-toast.danger { background: var(--danger); }
+        .app-toast.info { background: var(--brand); }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } }
+
+        /* ── Misc ─────────────────────────────────── */
+        .container-app { max-width: 1400px; margin: 0 auto; padding: 0 20px; }
+        .gap-section { margin-bottom: 20px; }
+        .text-right { text-align: right; }
+        .d-none { display: none !important; }
+        .font-mono { font-family: 'SF Mono', 'Cascadia Code', monospace; }
+        .count-badge {
+            background: var(--brand);
+            color: white;
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: 700;
+            min-width: 22px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="app-header">
+    <div class="container-app d-flex justify-content-between align-items-center">
+        <h1><i class="bi bi-file-earmark-text"></i> OCR Extractor</h1>
+        <div class="d-flex align-items-center gap-3">
+            <span class="header-badge" id="counterBadge"
+                  style="background:var(--brand-light);color:var(--brand-dark);">
+                0 facturas
+            </span>
+            {% if not ocr_available %}
+            <span class="header-badge" style="background:#fef2f2;color:var(--danger);">
+                <i class="bi bi-exclamation-triangle"></i> Sin API Key
+            </span>
+            {% endif %}
+        </div>
+    </div>
+</header>
+
+<main class="container-app" style="padding-top:24px; padding-bottom:60px;">
+
+    {% if not ocr_available %}
+    <!-- No API key warning -->
+    <div class="card-section" style="max-width:600px; margin:60px auto;">
+        <div class="section-header" style="background:#fffbeb; border-color:#fde68a;">
+            <h2 class="section-title"><i class="bi bi-key" style="color:var(--warning)"></i> Configuracion necesaria</h2>
+        </div>
+        <div style="padding:24px;">
+            <p style="font-size:.9rem;">Para usar el extractor de facturas, necesitas una API Key de Google Gemini.</p>
+            <ol style="font-size:.85rem; color:var(--text-muted); padding-left:20px;">
+                <li style="margin-bottom:8px;">Copia el archivo <code>.env.example</code> como <code>.env</code></li>
+                <li style="margin-bottom:8px;">Anade tu API Key de Gemini</li>
+                <li>Reinicia la aplicacion</li>
+            </ol>
+            <div style="background:#f1f5f9; padding:12px 16px; border-radius:8px; font-family:monospace; font-size:.8rem; margin-top:12px;">
+                GEMINI_API_KEY=tu-api-key-aqui
+            </div>
+        </div>
+    </div>
+    {% else %}
+
+    <div class="row g-4">
+        <!-- Left column: Upload + AI config -->
+        <div class="col-lg-4">
+            <!-- Upload dropzone -->
+            <div class="card-section gap-section">
+                <div class="section-header">
+                    <h2 class="section-title"><i class="bi bi-cloud-arrow-up"></i> Subir documentos</h2>
+                </div>
+                <div style="padding:16px;">
+                    <div class="dropzone" id="dropzone"
+                         ondragover="event.preventDefault(); this.classList.add('drag-over')"
+                         ondragleave="this.classList.remove('drag-over')"
+                         ondrop="event.preventDefault(); this.classList.remove('drag-over'); handleDrop(event)"
+                         onclick="document.getElementById('fileInput').click()">
+                        <div class="drop-icon"><i class="bi bi-file-earmark-arrow-up"></i></div>
+                        <h3>Arrastra tus facturas aqui</h3>
+                        <p>PDF, JPG o PNG &mdash; hasta 50 MB</p>
+                    </div>
+                    <input type="file" class="d-none" id="fileInput" accept=".pdf,.jpg,.jpeg,.png"
+                           multiple onchange="queueFiles(this.files)">
+                </div>
+                <!-- Queue list -->
+                <div id="queueSection" class="d-none">
+                    <div style="padding:8px 20px; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:.75rem; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em;">Cola de procesamiento</span>
+                        <span class="count-badge" id="queueCount">0</span>
+                    </div>
+                    <div class="queue-list" id="queueList"></div>
+                </div>
+            </div>
+
+            <!-- AI Prompt config -->
+            <div class="ai-prompt-section gap-section">
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+                    <i class="bi bi-stars" style="color:var(--brand); font-size:1.2rem;"></i>
+                    <div>
+                        <h3 style="font-size:.9rem; font-weight:600; margin:0;">Configurar campos</h3>
+                        <p style="font-size:.75rem; color:var(--text-muted); margin:0;">Dile a la IA que datos necesitas extraer</p>
+                    </div>
+                </div>
+                <textarea id="aiPromptInput" rows="3"
+                    placeholder="Ejemplo: Necesito solo el proveedor, NIF, numero de factura, fecha y el total. Tambien quiero el IBAN si aparece."></textarea>
+                <div style="display:flex; gap:8px; margin-top:8px;">
+                    <button class="btn-brand" onclick="applyAIConfig()" id="btnApplyConfig" style="flex:1;">
+                        <i class="bi bi-magic me-1"></i> Aplicar
+                    </button>
+                    <button class="btn-ghost" onclick="resetConfig()">
+                        <i class="bi bi-arrow-counterclockwise"></i>
+                    </button>
+                </div>
+                <div id="aiConfigResult" class="ai-config-result d-none"></div>
+                <!-- Active columns -->
+                <div style="margin-top:12px;">
+                    <p style="font-size:.72rem; font-weight:600; color:var(--text-muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:.05em;">Columnas activas</p>
+                    <div id="activeColumnTags"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right column: Data table -->
+        <div class="col-lg-8">
+            <div class="card-section">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <i class="bi bi-table"></i> Datos extraidos
+                        <span class="count-badge d-none" id="tableCount">0</span>
+                    </h2>
+                    <div class="d-flex gap-2">
+                        <button class="btn-ghost d-none" id="btnClear" onclick="clearAll()">
+                            <i class="bi bi-trash3 me-1"></i> Limpiar
+                        </button>
+                        <button class="btn-brand d-none" id="btnExport" onclick="exportExcel()">
+                            <i class="bi bi-file-earmark-excel me-1"></i> Exportar Excel
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Empty state -->
+                <div class="empty-state" id="emptyState">
+                    <i class="bi bi-inbox"></i>
+                    <p>Sube facturas para empezar.<br>Los datos extraidos apareceran aqui automaticamente.</p>
+                </div>
+
+                <!-- Table -->
+                <div class="data-table-wrap d-none" id="tableWrap">
+                    <table class="data-table" id="dataTable">
+                        <thead>
+                            <tr id="headerRow"></tr>
+                            <tr class="filter-row" id="filterRow"></tr>
+                        </thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% endif %}
+</main>
+
+<!-- Toast container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+'use strict';
+
+// ── State ──────────────────────────────────────────────────────
+const STATE = {
+    facturas: [],           // All extracted invoices
+    columns: {{ default_columns | tojson }},
+    columnLabels: {{ column_labels | tojson }},
+    customPrompt: '',       // Extra prompt for Gemini
+    queue: [],              // Files pending processing
+    processing: false,
+    sortCol: null,
+    sortDir: 'asc',
+    filters: {},
+    rowCounter: 0,
+};
+
+// ── Helpers ────────────────────────────────────────────────────
+function esc(s) {
+    const d = document.createElement('div');
+    d.textContent = s || '';
+    return d.innerHTML;
+}
+
+function toast(msg, type = 'info', ms = 4000) {
+    const c = document.getElementById('toastContainer');
+    const t = document.createElement('div');
+    t.className = `app-toast ${type}`;
+    t.innerHTML = `<i class="bi bi-${type === 'success' ? 'check-circle' : type === 'danger' ? 'exclamation-circle' : type === 'warning' ? 'exclamation-triangle' : 'info-circle'}"></i> ${esc(msg)}`;
+    c.appendChild(t);
+    setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, ms);
+}
+
+function numericCols() {
+    return ['importe_total', 'importe_base', 'iva', 'num_pasajeros'];
+}
+
+// ── Column tags ────────────────────────────────────────────────
+function renderColumnTags() {
+    const wrap = document.getElementById('activeColumnTags');
+    wrap.innerHTML = STATE.columns.map(c =>
+        `<span class="column-tag">${esc(STATE.columnLabels[c] || c)}</span>`
+    ).join('');
+}
+renderColumnTags();
+
+// ── File handling ──────────────────────────────────────────────
+function handleDrop(e) { queueFiles(e.dataTransfer.files); }
+
+function queueFiles(fileList) {
+    const valid = Array.from(fileList).filter(f => {
+        const ext = f.name.split('.').pop().toLowerCase();
+        return ['pdf', 'jpg', 'jpeg', 'png'].includes(ext);
+    });
+    if (!valid.length) { toast('Solo se aceptan PDF, JPG o PNG', 'warning'); return; }
+
+    valid.forEach(f => STATE.queue.push({ file: f, status: 'pending' }));
+    renderQueue();
+
+    if (!STATE.processing) processQueue();
+}
+
+function renderQueue() {
+    const sec = document.getElementById('queueSection');
+    const list = document.getElementById('queueList');
+    const badge = document.getElementById('queueCount');
+
+    if (STATE.queue.length === 0) { sec.classList.add('d-none'); return; }
+    sec.classList.remove('d-none');
+
+    const pending = STATE.queue.filter(q => q.status === 'pending').length;
+    const active = STATE.queue.filter(q => q.status === 'active').length;
+    badge.textContent = pending + active;
+
+    list.innerHTML = STATE.queue.map(q => `
+        <div class="queue-item">
+            <span class="status-dot ${q.status}"></span>
+            <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(q.file.name)}</span>
+            ${q.status === 'done' ? '<i class="bi bi-check" style="color:var(--success)"></i>' :
+              q.status === 'error' ? '<i class="bi bi-x" style="color:var(--danger)"></i>' : ''}
+        </div>
+    `).join('');
+}
+
+async function processQueue() {
+    STATE.processing = true;
+
+    while (true) {
+        const idx = STATE.queue.findIndex(q => q.status === 'pending');
+        if (idx < 0) break;
+
+        STATE.queue[idx].status = 'active';
+        renderQueue();
+        await processOneFile(STATE.queue[idx]);
+        STATE.queue[idx].status = STATE.queue[idx].error ? 'error' : 'done';
+        renderQueue();
+    }
+
+    STATE.processing = false;
+
+    // Clear completed from queue after 2s
+    setTimeout(() => {
+        STATE.queue = STATE.queue.filter(q => q.status !== 'done');
+        renderQueue();
+    }, 2000);
+
+    updateCounters();
+    if (STATE.facturas.length > 0) toast(`${STATE.facturas.length} facturas extraidas`, 'success');
+}
+
+async function processOneFile(queueItem) {
+    const form = new FormData();
+    form.append('file', queueItem.file);
+    if (STATE.customPrompt) form.append('custom_prompt', STATE.customPrompt);
+
+    try {
+        const resp = await fetch('/process', { method: 'POST', body: form });
+        const data = await resp.json();
+
+        if (data.ok && data.facturas && data.facturas.length > 0) {
+            data.facturas.forEach((fac, i) => {
+                STATE.rowCounter++;
+                const label = data.num_facturas > 1
+                    ? `${queueItem.file.name} [${i+1}/${data.num_facturas}]`
+                    : queueItem.file.name;
+                fac._rowId = STATE.rowCounter;
+                fac._filename = label;
+                STATE.facturas.push(fac);
+                addTableRow(fac);
+            });
+            if (data.num_facturas > 1) {
+                toast(`${queueItem.file.name}: ${data.num_facturas} facturas detectadas`, 'info');
+            }
+        } else {
+            queueItem.error = true;
+            toast(data.error || 'Error al procesar ' + queueItem.file.name, 'danger');
+        }
+    } catch (e) {
+        queueItem.error = true;
+        toast('Error de conexion al procesar ' + queueItem.file.name, 'danger');
+    }
+}
+
+// ── Table rendering ────────────────────────────────────────────
+function rebuildTable() {
+    buildHeaders();
+    const tbody = document.getElementById('tableBody');
+    tbody.innerHTML = '';
+    STATE.facturas.forEach(f => addTableRow(f));
+    updateCounters();
+}
+
+function buildHeaders() {
+    const hr = document.getElementById('headerRow');
+    const fr = document.getElementById('filterRow');
+    hr.innerHTML = '<th style="width:36px">#</th>';
+    fr.innerHTML = '<th></th>';
+
+    STATE.columns.forEach(col => {
+        const label = STATE.columnLabels[col] || col;
+        const isNum = numericCols().includes(col);
+        hr.innerHTML += `<th onclick="sortBy('${col}')" class="${isNum ? 'text-right' : ''}" data-col="${col}">
+            ${esc(label)} <i class="bi bi-chevron-expand sort-icon"></i>
+        </th>`;
+        fr.innerHTML += `<th><input class="filter-input" placeholder="Filtrar..." data-col="${col}" oninput="applyFilters()"></th>`;
+    });
+
+    hr.innerHTML += '<th style="width:120px">Archivo</th><th style="width:36px"></th>';
+    fr.innerHTML += '<th><input class="filter-input" placeholder="Filtrar..." data-col="_filename" oninput="applyFilters()"></th><th></th>';
+}
+
+function addTableRow(fac) {
+    showTable();
+    const tbody = document.getElementById('tableBody');
+    const tr = document.createElement('tr');
+    tr.id = `row-${fac._rowId}`;
+    tr.dataset.rowId = fac._rowId;
+
+    let html = `<td style="text-align:center;color:var(--text-muted);font-size:.75rem;">${fac._rowId}</td>`;
+
+    STATE.columns.forEach(col => {
+        const val = fac[col] || '';
+        const isNum = numericCols().includes(col);
+        html += `<td><input class="cell-input ${isNum ? 'num' : ''}" value="${esc(val)}"
+            data-row="${fac._rowId}" data-col="${col}"
+            onchange="cellEdited(this)"></td>`;
+    });
+
+    html += `<td style="font-size:.72rem;color:var(--text-muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+                 title="${esc(fac._filename)}">${esc(fac._filename)}</td>`;
+    html += `<td style="text-align:center"><button class="btn-icon" onclick="deleteRow(${fac._rowId})" title="Eliminar"><i class="bi bi-x-lg"></i></button></td>`;
+
+    tr.innerHTML = html;
+    tbody.appendChild(tr);
+    updateCounters();
+}
+
+function cellEdited(input) {
+    input.classList.add('edited');
+    const rowId = parseInt(input.dataset.row);
+    const col = input.dataset.col;
+    const fac = STATE.facturas.find(f => f._rowId === rowId);
+    if (fac) fac[col] = input.value;
+}
+
+function deleteRow(rowId) {
+    const tr = document.getElementById(`row-${rowId}`);
+    if (tr) tr.remove();
+    STATE.facturas = STATE.facturas.filter(f => f._rowId !== rowId);
+    updateCounters();
+    if (STATE.facturas.length === 0) hideTable();
+}
+
+function clearAll() {
+    if (!confirm('Eliminar todas las facturas extraidas?')) return;
+    STATE.facturas = [];
+    STATE.rowCounter = 0;
+    document.getElementById('tableBody').innerHTML = '';
+    hideTable();
+    updateCounters();
+}
+
+function showTable() {
+    document.getElementById('emptyState').classList.add('d-none');
+    document.getElementById('tableWrap').classList.remove('d-none');
+    document.getElementById('btnExport').classList.remove('d-none');
+    document.getElementById('btnClear').classList.remove('d-none');
+    document.getElementById('tableCount').classList.remove('d-none');
+}
+function hideTable() {
+    document.getElementById('emptyState').classList.remove('d-none');
+    document.getElementById('tableWrap').classList.add('d-none');
+    document.getElementById('btnExport').classList.add('d-none');
+    document.getElementById('btnClear').classList.add('d-none');
+    document.getElementById('tableCount').classList.add('d-none');
+}
+
+function updateCounters() {
+    const n = STATE.facturas.length;
+    document.getElementById('counterBadge').textContent = `${n} factura${n !== 1 ? 's' : ''}`;
+    document.getElementById('tableCount').textContent = n;
+}
+
+// ── Sorting ────────────────────────────────────────────────────
+function sortBy(col) {
+    if (STATE.sortCol === col) {
+        STATE.sortDir = STATE.sortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+        STATE.sortCol = col;
+        STATE.sortDir = 'asc';
+    }
+
+    // Update header icons
+    document.querySelectorAll('#headerRow th').forEach(th => {
+        th.classList.remove('sorted-asc', 'sorted-desc');
+        const icon = th.querySelector('.sort-icon');
+        if (icon) icon.className = 'bi bi-chevron-expand sort-icon';
+    });
+    const activeTh = document.querySelector(`#headerRow th[data-col="${col}"]`);
+    if (activeTh) {
+        activeTh.classList.add(`sorted-${STATE.sortDir}`);
+        const icon = activeTh.querySelector('.sort-icon');
+        if (icon) icon.className = `bi bi-chevron-${STATE.sortDir === 'asc' ? 'up' : 'down'} sort-icon`;
+    }
+
+    const isNum = numericCols().includes(col);
+    STATE.facturas.sort((a, b) => {
+        let va = (a[col] || '');
+        let vb = (b[col] || '');
+        if (isNum) {
+            va = parseFloat(va) || 0;
+            vb = parseFloat(vb) || 0;
+            return STATE.sortDir === 'asc' ? va - vb : vb - va;
+        }
+        va = va.toString().toLowerCase();
+        vb = vb.toString().toLowerCase();
+        const cmp = va.localeCompare(vb, 'es');
+        return STATE.sortDir === 'asc' ? cmp : -cmp;
+    });
+
+    // Re-render rows in sorted order
+    const tbody = document.getElementById('tableBody');
+    STATE.facturas.forEach(f => {
+        const tr = document.getElementById(`row-${f._rowId}`);
+        if (tr) tbody.appendChild(tr);
+    });
+
+    applyFilters();
+}
+
+// ── Filtering ──────────────────────────────────────────────────
+function applyFilters() {
+    const inputs = document.querySelectorAll('.filter-input');
+    const filters = {};
+    inputs.forEach(inp => {
+        const v = inp.value.trim().toLowerCase();
+        if (v) filters[inp.dataset.col] = v;
+    });
+    STATE.filters = filters;
+
+    const rows = document.querySelectorAll('#tableBody tr');
+    rows.forEach(tr => {
+        const rowId = parseInt(tr.dataset.rowId);
+        const fac = STATE.facturas.find(f => f._rowId === rowId);
+        if (!fac) return;
+
+        let visible = true;
+        for (const [col, term] of Object.entries(filters)) {
+            const val = (fac[col] || fac['_' + col] || '').toString().toLowerCase();
+            if (!val.includes(term)) { visible = false; break; }
+        }
+        tr.classList.toggle('hidden-row', !visible);
+    });
+}
+
+// ── AI column config ───────────────────────────────────────────
+async function applyAIConfig() {
+    const prompt = document.getElementById('aiPromptInput').value.trim();
+    if (!prompt) { toast('Escribe que campos necesitas extraer', 'warning'); return; }
+
+    const btn = document.getElementById('btnApplyConfig');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Analizando...';
+
+    try {
+        const resp = await fetch('/customize-columns', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt }),
+        });
+        const data = await resp.json();
+
+        if (data.columns && data.columns.length > 0) {
+            STATE.columns = data.columns;
+            STATE.columnLabels = { ...STATE.columnLabels, ...data.column_labels };
+            STATE.customPrompt = data.prompt_extra || '';
+            renderColumnTags();
+            rebuildTable();
+
+            const result = document.getElementById('aiConfigResult');
+            result.classList.remove('d-none');
+            result.innerHTML = `<i class="bi bi-check-circle" style="color:var(--success)"></i> ${esc(data.explanation)}`;
+
+            toast('Configuracion aplicada', 'success');
+        }
+    } catch {
+        toast('Error al configurar columnas', 'danger');
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-magic me-1"></i> Aplicar';
+}
+
+function resetConfig() {
+    STATE.columns = {{ default_columns | tojson }};
+    STATE.columnLabels = {{ column_labels | tojson }};
+    STATE.customPrompt = '';
+    document.getElementById('aiPromptInput').value = '';
+    document.getElementById('aiConfigResult').classList.add('d-none');
+    renderColumnTags();
+    rebuildTable();
+    toast('Columnas restauradas a las predeterminadas', 'info');
+}
+
+// ── Export ──────────────────────────────────────────────────────
+async function exportExcel() {
+    if (STATE.facturas.length === 0) { toast('No hay datos', 'warning'); return; }
+
+    const btn = document.getElementById('btnExport');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Generando...';
+
+    // Collect latest data from inputs
+    const cleanData = STATE.facturas.map(f => {
+        const row = {};
+        STATE.columns.forEach(col => { row[col] = f[col] || ''; });
+        row.filename = f._filename || '';
+        return row;
+    });
+
+    try {
+        const resp = await fetch('/export', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                facturas: cleanData,
+                columns: STATE.columns,
+                column_labels: STATE.columnLabels,
+            }),
+        });
+        const data = await resp.json();
+
+        if (data.ok) {
+            toast(`Excel generado con ${data.total} facturas`, 'success');
+            window.open('/download', '_blank');
+        } else {
+            toast(data.error || 'Error al exportar', 'danger');
+        }
+    } catch {
+        toast('Error de conexion', 'danger');
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-file-earmark-excel me-1"></i> Exportar Excel';
+}
+
+// ── Init ───────────────────────────────────────────────────────
+buildHeaders();
+</script>
+
+</body>
+</html>
