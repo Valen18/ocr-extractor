@@ -2,6 +2,7 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
+ARG CACHEBUST=1
 COPY . .
 RUN pip install --no-cache-dir -r requirements.txt
 
