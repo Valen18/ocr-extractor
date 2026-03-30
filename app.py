@@ -7,6 +7,7 @@ Uso:
     python app.py
 """
 
+import json
 import os
 import uuid
 from pathlib import Path
@@ -28,8 +29,28 @@ app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # 50MB
 BASE_DIR = Path(__file__).resolve().parent
 UPLOAD_DIR = BASE_DIR / "uploads"
 OUTPUT_DIR = BASE_DIR / "output"
+CONFIG_FILE = BASE_DIR / "column_config.json"
 UPLOAD_DIR.mkdir(exist_ok=True)
 OUTPUT_DIR.mkdir(exist_ok=True)
+
+
+def load_column_config() -> dict | None:
+    """Carga la configuracion de columnas guardada, o None si no existe."""
+    if CONFIG_FILE.exists():
+        try:
+            return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return None
+
+
+def save_column_config(columns: list, labels: dict, prompt: str = ""):
+    """Guarda la configuracion de columnas a disco."""
+    CONFIG_FILE.write_text(
+        json.dumps({"columns": columns, "column_labels": labels, "custom_prompt": prompt},
+                    ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
 
 _ocr_service = None
 
@@ -47,11 +68,13 @@ def get_service() -> OCRService:
 @app.route("/")
 def index():
     service = get_service()
+    saved = load_column_config()
     return render_template(
         "index.html",
         ocr_available=service.available,
         default_columns=DEFAULT_COLUMNS,
         column_labels=COLUMN_LABELS,
+        saved_config=saved,
     )
 
 
@@ -128,7 +151,34 @@ def customize_columns():
         })
 
     result = service.customize_columns(user_request)
+
+    # Persist config
+    if result.get("columns"):
+        save_column_config(
+            result["columns"],
+            result.get("column_labels", {}),
+            result.get("prompt_extra", ""),
+        )
+
     return jsonify(result)
+
+
+@app.route("/save-columns", methods=["POST"])
+def save_columns():
+    """Guarda la configuracion de columnas (cuando el usuario quita/anade manualmente)."""
+    data = request.get_json() or {}
+    columns = data.get("columns", [])
+    labels = data.get("column_labels", {})
+    prompt = data.get("custom_prompt", "")
+
+    if not columns:
+        # Reset to defaults
+        if CONFIG_FILE.exists():
+            CONFIG_FILE.unlink()
+        return jsonify({"ok": True, "reset": True})
+
+    save_column_config(columns, labels, prompt)
+    return jsonify({"ok": True})
 
 
 @app.route("/export", methods=["POST"])

@@ -155,8 +155,10 @@
             font-size: 0.82rem;
         }
         .column-tag {
-            display: inline-block;
-            padding: 2px 10px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px 3px 10px;
             border-radius: 20px;
             font-size: 0.75rem;
             font-weight: 500;
@@ -164,7 +166,30 @@
             background: var(--brand-light);
             color: var(--brand-dark);
             border: 1px solid #c7d2fe;
+            transition: all .15s;
         }
+        .column-tag .tag-remove {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            color: var(--brand);
+            cursor: pointer;
+            font-size: 0.65rem;
+            padding: 0;
+            line-height: 1;
+            opacity: 0.4;
+            transition: all .15s;
+        }
+        .column-tag .tag-remove:hover {
+            opacity: 1;
+            background: #c7d2fe;
+        }
+        .column-tag:hover { background: #e0e7ff; }
 
         /* ── Queue ────────────────────────────────── */
         .queue-list {
@@ -538,12 +563,18 @@
 'use strict';
 
 // ── State ──────────────────────────────────────────────────────
-const STATE = {
-    facturas: [],           // All extracted invoices
+const DEFAULTS = {
     columns: {{ default_columns | tojson }},
     columnLabels: {{ column_labels | tojson }},
-    customPrompt: '',       // Extra prompt for Gemini
-    queue: [],              // Files pending processing
+};
+const SAVED = {{ saved_config | tojson if saved_config else 'null' }};
+
+const STATE = {
+    facturas: [],
+    columns: SAVED ? SAVED.columns : [...DEFAULTS.columns],
+    columnLabels: SAVED ? { ...DEFAULTS.columnLabels, ...SAVED.column_labels } : { ...DEFAULTS.columnLabels },
+    customPrompt: SAVED ? (SAVED.custom_prompt || '') : '',
+    queue: [],
     processing: false,
     sortCol: null,
     sortDir: 'asc',
@@ -575,9 +606,35 @@ function numericCols() {
 function renderColumnTags() {
     const wrap = document.getElementById('activeColumnTags');
     wrap.innerHTML = STATE.columns.map(c =>
-        `<span class="column-tag">${esc(STATE.columnLabels[c] || c)}</span>`
+        `<span class="column-tag">
+            ${esc(STATE.columnLabels[c] || c)}
+            <button class="tag-remove" onclick="removeColumn('${c}')" title="Quitar columna">
+                <i class="bi bi-x"></i>
+            </button>
+        </span>`
     ).join('');
 }
+
+function removeColumn(col) {
+    if (STATE.columns.length <= 1) { toast('Debe haber al menos una columna', 'warning'); return; }
+    STATE.columns = STATE.columns.filter(c => c !== col);
+    renderColumnTags();
+    rebuildTable();
+    persistColumns();
+}
+
+function persistColumns() {
+    fetch('/save-columns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            columns: STATE.columns,
+            column_labels: STATE.columnLabels,
+            custom_prompt: STATE.customPrompt,
+        }),
+    }).catch(() => {});
+}
+
 renderColumnTags();
 
 // ── File handling ──────────────────────────────────────────────
@@ -877,7 +934,7 @@ async function applyAIConfig() {
             result.classList.remove('d-none');
             result.innerHTML = `<i class="bi bi-check-circle" style="color:var(--success)"></i> ${esc(data.explanation)}`;
 
-            toast('Configuracion aplicada', 'success');
+            toast('Configuracion aplicada y guardada', 'success');
         }
     } catch {
         toast('Error al configurar columnas', 'danger');
@@ -888,13 +945,19 @@ async function applyAIConfig() {
 }
 
 function resetConfig() {
-    STATE.columns = {{ default_columns | tojson }};
-    STATE.columnLabels = {{ column_labels | tojson }};
+    STATE.columns = [...DEFAULTS.columns];
+    STATE.columnLabels = { ...DEFAULTS.columnLabels };
     STATE.customPrompt = '';
     document.getElementById('aiPromptInput').value = '';
     document.getElementById('aiConfigResult').classList.add('d-none');
     renderColumnTags();
     rebuildTable();
+    // Clear saved config on server
+    fetch('/save-columns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ columns: [] }),
+    }).catch(() => {});
     toast('Columnas restauradas a las predeterminadas', 'info');
 }
 
