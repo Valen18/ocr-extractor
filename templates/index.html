@@ -412,25 +412,21 @@
 
 <!-- Navbar Descapada -->
 <nav class="navbar">
-    <div class="container-app d-flex justify-content-between align-items-center">
-        <div class="d-flex align-items-center">
-            <a href="/" class="d-flex align-items-center text-decoration-none">
-                <img src="https://descapada.com/wp-content/uploads/2023/01/descapada-logo.png"
-                     alt="Descapada" class="brand-logo">
-                <span class="brand-sub">OCR Extractor</span>
-            </a>
-        </div>
-        <div class="d-flex align-items-center gap-3">
-            <span class="header-badge" id="counterBadge"
-                  style="background:var(--brand-light);color:var(--brand-dark);">
-                0 facturas
-            </span>
-            {% if not ocr_available %}
-            <span class="header-badge" style="background:#fef2f2;color:var(--danger);">
-                <i class="bi bi-exclamation-triangle"></i> Sin API Key
-            </span>
-            {% endif %}
-        </div>
+    <div style="width:100%; padding:0 32px; display:flex; justify-content:space-between; align-items:center;">
+        <a href="/" class="d-flex align-items-center text-decoration-none">
+            <img src="https://descapada.com/wp-content/uploads/2023/01/descapada-logo.png"
+                 alt="Descapada" class="brand-logo">
+            <span class="brand-sub">OCR Extractor</span>
+        </a>
+        <span class="header-badge" id="counterBadge"
+              style="background:var(--brand-light);color:var(--brand-dark);">
+            0 facturas
+        </span>
+        {% if not ocr_available %}
+        <span class="header-badge" style="background:#fef2f2;color:var(--danger);">
+            <i class="bi bi-exclamation-triangle"></i> Sin API Key
+        </span>
+        {% endif %}
     </div>
 </nav>
 
