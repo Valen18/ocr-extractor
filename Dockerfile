@@ -9,4 +9,4 @@ COPY . .
 
 RUN mkdir -p uploads output
 
-CMD gunicorn app:app --bind 0.0.0.0:${PORT:-8080} --workers 2 --timeout 300
+CMD ["sh", "-c", "gunicorn app:app --bind 0.0.0.0:${PORT:-8080} --workers 2 --timeout 300"]
