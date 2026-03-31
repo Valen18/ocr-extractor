@@ -33,9 +33,53 @@ CONFIG_FILE = BASE_DIR / "column_config.json"
 UPLOAD_DIR.mkdir(exist_ok=True)
 OUTPUT_DIR.mkdir(exist_ok=True)
 
+DB_URL = os.environ.get("DATABASE_URL", "")
+
+
+def _get_db():
+    import psycopg2
+    return psycopg2.connect(DB_URL)
+
+
+def _ensure_config_table():
+    if not DB_URL:
+        return
+    try:
+        conn = _get_db()
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS app_config (
+                    key VARCHAR(100) PRIMARY KEY,
+                    value JSONB NOT NULL
+                )
+            """)
+            conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+
+_config_table_ready = False
+
 
 def load_column_config() -> dict | None:
-    """Carga la configuracion de columnas guardada, o None si no existe."""
+    """Carga la configuracion de columnas guardada."""
+    global _config_table_ready
+    if DB_URL:
+        try:
+            if not _config_table_ready:
+                _ensure_config_table()
+                _config_table_ready = True
+            conn = _get_db()
+            with conn.cursor() as cur:
+                cur.execute("SELECT value FROM app_config WHERE key = 'column_config'")
+                row = cur.fetchone()
+            conn.close()
+            if row:
+                return row[0] if isinstance(row[0], dict) else json.loads(row[0])
+        except Exception:
+            pass
+
     if CONFIG_FILE.exists():
         try:
             return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
@@ -45,12 +89,29 @@ def load_column_config() -> dict | None:
 
 
 def save_column_config(columns: list, labels: dict, prompt: str = ""):
-    """Guarda la configuracion de columnas a disco."""
+    """Guarda la configuracion de columnas."""
+    data = {"columns": columns, "column_labels": labels, "custom_prompt": prompt}
+
+    # Always save local copy
     CONFIG_FILE.write_text(
-        json.dumps({"columns": columns, "column_labels": labels, "custom_prompt": prompt},
-                    ensure_ascii=False, indent=2),
+        json.dumps(data, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+
+    # Also save to DB if available
+    if DB_URL:
+        try:
+            _ensure_config_table()
+            conn = _get_db()
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO app_config (key, value) VALUES ('column_config', %s)
+                    ON CONFLICT (key) DO UPDATE SET value = %s
+                """, (json.dumps(data), json.dumps(data)))
+                conn.commit()
+            conn.close()
+        except Exception:
+            pass
 
 _ocr_service = None
 
