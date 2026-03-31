@@ -1,0 +1,85 @@
+============================================================
+  OCR EXTRACTOR - Descapada
+  Extraccion automatica de datos de facturas con IA
+============================================================
+
+REQUISITOS
+----------
+- Python 3.10 o superior
+  Descarga: https://www.python.org/downloads/
+  IMPORTANTE: Durante la instalacion, marca "Add Python to PATH"
+
+
+INSTALACION (solo la primera vez)
+---------------------------------
+
+1. Abre una terminal (CMD o PowerShell) en esta carpeta
+
+2. Instala las dependencias:
+
+   pip install -r requirements.txt
+
+3. Listo. No hay mas configuracion necesaria.
+   La API Key de Gemini ya esta incluida en el archivo .env
+
+
+ARRANCAR LA APLICACION
+----------------------
+
+1. Abre una terminal en esta carpeta
+
+2. Ejecuta:
+
+   python app.py
+
+3. Abre el navegador en:
+
+   http://localhost:5001
+
+4. Para parar el servidor: pulsa Ctrl+C en la terminal
+
+
+USO
+---
+
+1. SUBIR FACTURAS
+   - Arrastra archivos PDF, JPG o PNG a la zona de subida
+   - Puedes subir varios a la vez, se procesan en cola
+   - Los datos extraidos aparecen automaticamente en la tabla
+
+2. CONFIGURAR CAMPOS (opcional)
+   - En "Configurar campos", escribe que datos necesitas
+   - Ejemplo: "Solo necesito proveedor, NIF, factura, fecha y total"
+   - Pulsa "Aplicar" y la IA ajustara las columnas
+   - Puedes quitar columnas con la X de cada pill
+   - La configuracion se guarda automaticamente
+
+3. EDITAR DATOS
+   - Haz clic en cualquier celda de la tabla para editarla
+   - Puedes ordenar por cualquier columna (clic en la cabecera)
+   - Puedes filtrar por texto en cada columna
+
+4. EXPORTAR A EXCEL
+   - Pulsa "Exportar Excel" para descargar un .xlsx formateado
+
+
+DESPLIEGUE EN SERVIDOR (opcional)
+---------------------------------
+
+Para ponerlo en un servidor de produccion:
+
+   pip install -r requirements.txt
+   gunicorn app:app --bind 0.0.0.0:5001 --workers 2 --timeout 300
+
+O con Docker:
+
+   docker build -t ocr-extractor .
+   docker run -p 5001:8080 --env-file .env ocr-extractor
+
+
+SOPORTE
+-------
+Contacto: valen.ayesa@gmail.com
+
+
+============================================================

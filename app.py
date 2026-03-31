@@ -265,6 +265,43 @@ def download():
     )
 
 
+ADMIN_PASSWORD = "Consum0!@2027!"
+
+
+@app.route("/admin", methods=["GET", "POST"])
+def admin_login():
+    """Login del backoffice."""
+    if request.method == "POST":
+        pwd = request.form.get("password", "")
+        if pwd == ADMIN_PASSWORD:
+            from usage_tracker import get_daily_summary, get_totals, get_all_entries
+            return render_template(
+                "admin.html",
+                authenticated=True,
+                daily=get_daily_summary(),
+                totals=get_totals(),
+                entries=get_all_entries()[:200],
+                password=pwd,
+            )
+        return render_template("admin.html", authenticated=False, error=True)
+    return render_template("admin.html", authenticated=False)
+
+
+@app.route("/admin/api", methods=["POST"])
+def admin_api():
+    """API JSON para el dashboard (refrescar sin recargar)."""
+    data = request.get_json() or {}
+    if data.get("password") != ADMIN_PASSWORD:
+        return jsonify({"error": "No autorizado"}), 401
+
+    from usage_tracker import get_daily_summary, get_totals, get_all_entries
+    return jsonify({
+        "daily": get_daily_summary(),
+        "totals": get_totals(),
+        "entries": get_all_entries()[:200],
+    })
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5001))
     print(f"\n  OCR Extractor corriendo en http://localhost:{port}\n")

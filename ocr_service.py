@@ -210,6 +210,23 @@ class OCRService:
                 if fac and (fac.numero_factura or fac.importe_total):
                     facturas.append(fac)
 
+            # Track API usage
+            try:
+                from usage_tracker import log_usage
+                um = response.usage_metadata
+                if um:
+                    log_usage(
+                        operation="extract",
+                        filename=file_path.name,
+                        prompt_tokens=um.prompt_token_count or 0,
+                        output_tokens=um.candidates_token_count or 0,
+                        thinking_tokens=getattr(um, "thoughts_token_count", 0) or 0,
+                        total_tokens=um.total_token_count or 0,
+                        num_facturas=len(facturas),
+                    )
+            except Exception:
+                pass
+
             # Clean uploaded file
             try:
                 self._gemini_client.files.delete(name=uploaded.name)
@@ -259,6 +276,22 @@ Responde SOLO con JSON valido:
                 model="gemini-2.5-flash",
                 contents=system_prompt + "\n\nPeticion del usuario: " + user_request,
             )
+
+            # Track API usage
+            try:
+                from usage_tracker import log_usage
+                um = response.usage_metadata
+                if um:
+                    log_usage(
+                        operation="customize_columns",
+                        filename="",
+                        prompt_tokens=um.prompt_token_count or 0,
+                        output_tokens=um.candidates_token_count or 0,
+                        thinking_tokens=getattr(um, "thoughts_token_count", 0) or 0,
+                        total_tokens=um.total_token_count or 0,
+                    )
+            except Exception:
+                pass
 
             text = response.text.strip()
             if text.startswith("```"):
