@@ -13,10 +13,12 @@ from threading import Lock
 USAGE_FILE = Path(__file__).resolve().parent / "usage_log.json"
 
 # Gemini 2.5 Flash pricing (USD per million tokens)
+# Fuente: https://ai.google.dev/gemini-api/docs/pricing
+# Output price ($2.50/M) already includes thinking tokens
 PRICING = {
-    "input": 0.15 / 1_000_000,
-    "output": 0.60 / 1_000_000,
-    "thinking": 0.35 / 1_000_000,
+    "input": 0.30 / 1_000_000,     # $0.30 per 1M tokens (text/image/video)
+    "output": 2.50 / 1_000_000,    # $2.50 per 1M tokens (includes thinking)
+    "thinking": 0.0,               # included in output price
 }
 
 _lock = Lock()
