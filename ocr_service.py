@@ -120,7 +120,8 @@ DEFAULT_COLUMNS = [
     "proveedor", "nif_proveedor", "numero_factura", "fecha",
     "importe_total", "importe_base", "iva", "tipo_iva",
     "descripcion", "pasajeros", "num_pasajeros",
-    "localizador", "fecha_inicio", "fecha_fin", "moneda", "notas",
+    "localizador", "nuestro_localizador",
+    "fecha_inicio", "fecha_fin", "moneda", "notas",
 ]
 
 # Human-readable labels
@@ -139,6 +140,7 @@ COLUMN_LABELS = {
     "pasajeros": "Pasajeros",
     "num_pasajeros": "N. Pasajeros",
     "localizador": "Localizador",
+    "nuestro_localizador": "Nuestro Localizador",
     "fecha_inicio": "F. Inicio",
     "fecha_fin": "F. Fin",
     "moneda": "Moneda",

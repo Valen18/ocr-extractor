@@ -20,6 +20,10 @@ from ocr_service import (
     OCRService, extract_date_from_filename,
     DEFAULT_COLUMNS, COLUMN_LABELS,
 )
+from reference_matcher import (
+    parse_excel_to_records, save_reference, get_reference_status,
+    clear_reference, enrich_facturas,
+)
 
 load_dotenv()
 
@@ -130,13 +134,71 @@ def get_service() -> OCRService:
 def index():
     service = get_service()
     saved = load_column_config()
+    ref_status = get_reference_status()
     return render_template(
         "index.html",
         ocr_available=service.available,
         default_columns=DEFAULT_COLUMNS,
         column_labels=COLUMN_LABELS,
         saved_config=saved,
+        reference_loaded=ref_status["loaded"],
+        reference_count=ref_status["count"],
     )
+
+
+@app.route("/reference/upload", methods=["POST"])
+def reference_upload():
+    """Sube el Excel de referencia con las reservas propias."""
+    if "file" not in request.files:
+        return jsonify({"ok": False, "error": "No se envio archivo."}), 400
+
+    file = request.files["file"]
+    if not file.filename:
+        return jsonify({"ok": False, "error": "Archivo sin nombre."}), 400
+
+    ext = Path(file.filename).suffix.lower()
+    if ext not in {".xlsx", ".xls"}:
+        return jsonify({"ok": False, "error": f"Formato no soportado: {ext}. Usa Excel (.xlsx o .xls)."}), 400
+
+    # Save file temporarily
+    tmp_path = UPLOAD_DIR / f"ref_{uuid.uuid4().hex[:8]}{ext}"
+    file.save(str(tmp_path))
+
+    try:
+        records = parse_excel_to_records(tmp_path)
+        if not records:
+            return jsonify({"ok": False, "error": "El Excel no contiene datos validos (nombres/localizadores)."}), 400
+
+        count = save_reference(records)
+
+        return jsonify({
+            "ok": True,
+            "count": count,
+            "filename": file.filename,
+            "message": f"{count} reservas cargadas correctamente.",
+        })
+
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Error al procesar Excel: {str(e)}"}), 500
+
+    finally:
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+
+@app.route("/reference/status")
+def reference_status():
+    """Devuelve el estado de la referencia cargada."""
+    return jsonify(get_reference_status())
+
+
+@app.route("/reference/clear", methods=["POST"])
+def reference_clear():
+    """Borra la referencia cargada."""
+    clear_reference()
+    return jsonify({"ok": True})
 
 
 @app.route("/process", methods=["POST"])
@@ -177,6 +239,9 @@ def process_file():
                     fac.fecha = filename_date
 
         facturas_data = [f.to_dict() for f in facturas]
+
+        # Enrich with reference (formats names + adds nuestro_localizador)
+        facturas_data = enrich_facturas(facturas_data)
 
         return jsonify({
             "ok": True,

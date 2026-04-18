@@ -285,6 +285,16 @@
         .data-table tbody tr:hover td { background: #f8fafc; }
         .data-table tbody tr.hidden-row { display: none; }
 
+        /* Highlighted column (nuestro_localizador) */
+        .data-table th.col-highlight {
+            background: #eef2ff !important;
+            color: var(--brand-dark) !important;
+            border-bottom: 2px solid var(--brand);
+        }
+        .data-table td.col-highlight { background: #f5f6ff; }
+        .data-table td.col-highlight .cell-input { font-weight: 600; color: var(--brand-dark); }
+        .data-table tbody tr:hover td.col-highlight { background: #e0e7ff !important; }
+
         /* Inline editable cells */
         .cell-input {
             border: none;
@@ -509,6 +519,52 @@
                     <div id="activeColumnTags"></div>
                 </div>
             </div>
+
+            <!-- Reference bookings (orb-manual) -->
+            <div class="card-section gap-section">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <i class="bi bi-journal-check"></i> Nuestras reservas
+                        <span id="refStatusBadge" class="{% if reference_loaded %}d-inline{% else %}d-none{% endif %}"
+                              style="margin-left:4px;background:#ecfdf5;color:#059669;padding:2px 8px;border-radius:10px;font-size:.7rem;font-weight:600;">
+                            <i class="bi bi-check-circle"></i> <span id="refCount">{{ reference_count }}</span>
+                        </span>
+                    </h2>
+                </div>
+                <div style="padding:16px;">
+                    <p style="font-size:.78rem; color:var(--text-muted); margin:0 0 12px;">
+                        Sube tu Excel de reservas (ej: <code style="font-size:.72rem;">orb-manual.xlsx</code>) para que el OCR rellene automaticamente la columna <strong>Nuestro Localizador</strong>.
+                    </p>
+                    <div id="refUploadWrap" class="{% if reference_loaded %}d-none{% endif %}">
+                        <div class="dropzone" id="refDropzone" style="padding:24px 16px;"
+                             ondragover="event.preventDefault(); this.classList.add('drag-over')"
+                             ondragleave="this.classList.remove('drag-over')"
+                             ondrop="event.preventDefault(); this.classList.remove('drag-over'); handleRefDrop(event)"
+                             onclick="document.getElementById('refFileInput').click()">
+                            <i class="bi bi-file-earmark-spreadsheet" style="font-size:1.4rem; color:var(--brand);"></i>
+                            <p style="margin:6px 0 0; font-size:.8rem; font-weight:500;">Subir Excel de reservas</p>
+                            <small style="color:var(--text-muted);">Busca "Nombre completo" y "Localizador"</small>
+                        </div>
+                        <input type="file" id="refFileInput" accept=".xlsx,.xls" class="d-none"
+                               onchange="uploadReference(this.files[0])">
+                    </div>
+                    <div id="refLoadedWrap" class="{% if not reference_loaded %}d-none{% endif %}"
+                         style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 14px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <div style="font-size:.85rem; font-weight:600;">
+                                    <i class="bi bi-check-circle-fill" style="color:#059669;"></i>
+                                    <span id="refLoadedText">{{ reference_count }} reservas cargadas</span>
+                                </div>
+                                <small style="color:var(--text-muted);">Se enriquecera cada factura automaticamente</small>
+                            </div>
+                            <button class="btn-ghost" onclick="clearReference()" style="padding:4px 10px;">
+                                <i class="bi bi-trash3"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Right column: Data table -->
@@ -522,6 +578,9 @@
                     <div class="d-flex gap-2">
                         <button class="btn-ghost d-none" id="btnClear" onclick="clearAll()">
                             <i class="bi bi-trash3 me-1"></i> Limpiar
+                        </button>
+                        <button class="btn-ghost d-none" id="btnCopy" onclick="copyTable()">
+                            <i class="bi bi-clipboard me-1"></i> Copiar tabla
                         </button>
                         <button class="btn-brand d-none" id="btnExport" onclick="exportExcel()">
                             <i class="bi bi-file-earmark-excel me-1"></i> Exportar Excel
@@ -748,10 +807,11 @@ function buildHeaders() {
     STATE.columns.forEach(col => {
         const label = STATE.columnLabels[col] || col;
         const isNum = numericCols().includes(col);
-        hr.innerHTML += `<th onclick="sortBy('${col}')" class="${isNum ? 'text-right' : ''}" data-col="${col}">
+        const highlight = col === 'nuestro_localizador' ? 'col-highlight' : '';
+        hr.innerHTML += `<th onclick="sortBy('${col}')" class="${isNum ? 'text-right' : ''} ${highlight}" data-col="${col}">
             ${esc(label)} <i class="bi bi-chevron-expand sort-icon"></i>
         </th>`;
-        fr.innerHTML += `<th><input class="filter-input" placeholder="Filtrar..." data-col="${col}" oninput="applyFilters()"></th>`;
+        fr.innerHTML += `<th class="${highlight}"><input class="filter-input" placeholder="Filtrar..." data-col="${col}" oninput="applyFilters()"></th>`;
     });
 
     hr.innerHTML += '<th style="width:120px">Archivo</th><th style="width:36px"></th>';
@@ -770,7 +830,8 @@ function addTableRow(fac) {
     STATE.columns.forEach(col => {
         const val = fac[col] || '';
         const isNum = numericCols().includes(col);
-        html += `<td><input class="cell-input ${isNum ? 'num' : ''}" value="${esc(val)}"
+        const highlight = col === 'nuestro_localizador' ? 'col-highlight' : '';
+        html += `<td class="${highlight}"><input class="cell-input ${isNum ? 'num' : ''}" value="${esc(val)}"
             data-row="${fac._rowId}" data-col="${col}"
             onchange="cellEdited(this)"></td>`;
     });
@@ -813,6 +874,7 @@ function showTable() {
     document.getElementById('emptyState').classList.add('d-none');
     document.getElementById('tableWrap').classList.remove('d-none');
     document.getElementById('btnExport').classList.remove('d-none');
+    document.getElementById('btnCopy').classList.remove('d-none');
     document.getElementById('btnClear').classList.remove('d-none');
     document.getElementById('tableCount').classList.remove('d-none');
 }
@@ -820,6 +882,7 @@ function hideTable() {
     document.getElementById('emptyState').classList.remove('d-none');
     document.getElementById('tableWrap').classList.add('d-none');
     document.getElementById('btnExport').classList.add('d-none');
+    document.getElementById('btnCopy').classList.add('d-none');
     document.getElementById('btnClear').classList.add('d-none');
     document.getElementById('tableCount').classList.add('d-none');
 }
@@ -997,6 +1060,110 @@ async function exportExcel() {
 
     btn.disabled = false;
     btn.innerHTML = '<i class="bi bi-file-earmark-excel me-1"></i> Exportar Excel';
+}
+
+// ── Copy table to clipboard ────────────────────────────────────
+async function copyTable() {
+    if (STATE.facturas.length === 0) { toast('No hay datos', 'warning'); return; }
+
+    // Build TSV (tab-separated values) - pastes nicely into Excel/Sheets
+    const headers = STATE.columns.map(c => STATE.columnLabels[c] || c);
+    const rows = STATE.facturas
+        .filter(f => {
+            // Respect filters: only copy visible rows
+            const tr = document.getElementById(`row-${f._rowId}`);
+            return tr && !tr.classList.contains('hidden-row');
+        })
+        .map(f => STATE.columns.map(col => {
+            const v = f[col] || '';
+            // Escape tabs/newlines
+            return String(v).replace(/\t/g, ' ').replace(/\r?\n/g, ' ');
+        }));
+
+    const tsv = [headers.join('\t'), ...rows.map(r => r.join('\t'))].join('\n');
+
+    try {
+        await navigator.clipboard.writeText(tsv);
+        const btn = document.getElementById('btnCopy');
+        const orig = btn.innerHTML;
+        btn.innerHTML = '<i class="bi bi-check-circle me-1"></i> Copiado';
+        btn.style.background = '#ecfdf5';
+        btn.style.color = '#059669';
+        setTimeout(() => {
+            btn.innerHTML = orig;
+            btn.style.background = '';
+            btn.style.color = '';
+        }, 2000);
+        toast(`${rows.length} filas copiadas. Pega en Excel/Sheets con Ctrl+V`, 'success');
+    } catch {
+        toast('No se pudo copiar al portapapeles', 'danger');
+    }
+}
+
+// ── Reference (nuestras reservas) ──────────────────────────────
+function handleRefDrop(e) {
+    const f = e.dataTransfer.files[0];
+    if (f) uploadReference(f);
+}
+
+async function uploadReference(file) {
+    if (!file) return;
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['xlsx', 'xls'].includes(ext)) {
+        toast('Solo se aceptan archivos Excel (.xlsx o .xls)', 'warning');
+        return;
+    }
+
+    const dropzone = document.getElementById('refDropzone');
+    const originalHTML = dropzone.innerHTML;
+    dropzone.innerHTML = '<div class="spinner-border spinner-border-sm text-primary"></div><p style="margin:6px 0 0; font-size:.8rem;">Procesando...</p>';
+
+    const form = new FormData();
+    form.append('file', file);
+
+    try {
+        const resp = await fetch('/reference/upload', { method: 'POST', body: form });
+        const data = await resp.json();
+
+        if (data.ok) {
+            document.getElementById('refUploadWrap').classList.add('d-none');
+            document.getElementById('refLoadedWrap').classList.remove('d-none');
+            document.getElementById('refLoadedText').textContent = `${data.count} reservas cargadas`;
+            document.getElementById('refStatusBadge').classList.remove('d-none');
+            document.getElementById('refStatusBadge').classList.add('d-inline');
+            document.getElementById('refCount').textContent = data.count;
+            toast(data.message, 'success');
+        } else {
+            dropzone.innerHTML = originalHTML;
+            toast(data.error || 'Error al subir archivo', 'danger');
+        }
+    } catch {
+        dropzone.innerHTML = originalHTML;
+        toast('Error de conexion', 'danger');
+    }
+}
+
+async function clearReference() {
+    if (!confirm('Borrar las reservas cargadas? El OCR dejara de rellenar "Nuestro Localizador".')) return;
+
+    try {
+        await fetch('/reference/clear', { method: 'POST' });
+        document.getElementById('refUploadWrap').classList.remove('d-none');
+        document.getElementById('refLoadedWrap').classList.add('d-none');
+        document.getElementById('refStatusBadge').classList.add('d-none');
+
+        // Restore dropzone content
+        const dropzone = document.getElementById('refDropzone');
+        dropzone.innerHTML = `
+            <i class="bi bi-file-earmark-spreadsheet" style="font-size:1.4rem; color:var(--brand);"></i>
+            <p style="margin:6px 0 0; font-size:.8rem; font-weight:500;">Subir Excel de reservas</p>
+            <small style="color:var(--text-muted);">Busca "Nombre completo" y "Localizador"</small>
+        `;
+
+        toast('Reservas borradas', 'info');
+    } catch {
+        toast('Error al borrar', 'danger');
+    }
 }
 
 // ── Init ───────────────────────────────────────────────────────
